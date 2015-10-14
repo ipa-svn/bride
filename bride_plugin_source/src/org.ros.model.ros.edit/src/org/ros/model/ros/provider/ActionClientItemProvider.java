@@ -161,7 +161,7 @@ public class ActionClientItemProvider
 				}
 				return strings;
 			}
-			});
+		});
 	}
 
 	/**
