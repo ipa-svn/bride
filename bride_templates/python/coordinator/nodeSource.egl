@@ -81,7 +81,33 @@ for (parameter in node.parameter)
 		pass
 
 	def	configure(self):
-		sm0 = smach.StateMachine(outcomes=['succeeded','aborted','preempted'], input_keys = ['action_feedback'], output_keys = ['action_feedback'])
+
+		[%
+		var args: Sequence;
+		args = node.Args.split(", ");
+		var action_name = "TestAction";
+		var goal_key_string = "";
+		var result_key_string = "";
+		for(ar in args){
+			var current_arg: Sequence;
+			current_arg = ar.split("=");
+			if(current_arg[0] == "action"){
+				action_name = current_arg[1];
+			}
+			else if(current_arg[0] == "goal_key"){
+				goal_key_string = current_arg[1];
+			}
+			else if(current_arg[0] == "result_key"){
+				result_key_string = current_arg[1];
+			}
+		}			
+		%]
+		[%if(goal_key_string.length() > 0){if(result_key_string.length() > 0){%]
+		sm0 = smach.StateMachine(outcomes=['succeeded','aborted','preempted'],	
+			input_keys = [[%=goal_key_string%], [%=result_key_string%]], output_keys = [[%=result_key_string%]])
+		[%}else{%]
+		sm0 = smach.StateMachine(outcomes=['succeeded','aborted','preempted'])
+		[%}}%]
 		[%=out.startPreserve("#", "#", "user data defs", true)%]
 		[%=out.stopPreserve()%]
 		sis = smach_ros.IntrospectionServer('[%=node.name.replace(" ", "_")%]', sm0, '/[%=node.name.replace(" ", "_")%]_sm')
@@ -145,7 +171,7 @@ for (parameter in node.parameter)
 				[%=out.stopPreserve()%]
 				)
 
-				
+
 		[%
 		}%]
 		[%
@@ -206,7 +232,15 @@ for (parameter in node.parameter)
 		[%
 			}
 		}%]
-		asw = ActionServerWrapper( '[%=node.name.replace(" ", "_")%]', TestAction,  wrapped_container = sm0, succeeded_outcomes = ['succeeded'], aborted_outcomes = ['aborted'], preempted_outcomes = ['preempted'] )
+
+		asw = ActionServerWrapper( '[%=node.name.replace(" ", "_")%]', [%=action_name%],  wrapped_container = sm0, 
+			succeeded_outcomes = ['succeeded'], aborted_outcomes = ['aborted'], preempted_outcomes = ['preempted'],
+			[%if(goal_key_string.length() > 0){%]
+			goal_key = [%=goal_key_string%], 
+			[%}if(result_key_string.length() > 0){%]
+			result_key = [%=result_key_string%]
+			[%}%]
+			)
 		asw.run_server()
 		[% }%]
 
