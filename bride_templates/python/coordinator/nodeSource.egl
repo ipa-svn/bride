@@ -8,12 +8,20 @@ from actionlib.msg import *
 from smach_ros import ActionServerWrapper
 [%
 var acstypes: Sequence;
+var dubl = 0;
+var tmp: Sequence;
 for (ac in node.actionclient){
+	for (tk in tmp){
+		if (tk.ActionType == ac.ActionType){
+			dubl = dubl +1;
+		}
+	}
+	if (dubl < 1){
+	tmp.add(ac);
 	acstypes = ac.ActionType.split('::');
 	%]
 from [%=acstypes[0]%].msg import [%=acstypes[1]%]Action, [%=acstypes[1]%]Goal
-[% } %]
-
+[% }} %]
 [%
 var servicetypes: Sequence;
 for (service in node.serviceClient){
@@ -69,13 +77,17 @@ for (parameter in node.parameter)
 		}%]
 		[%=out.startPreserve("#", "#", "initCode", true)%]
 		[%=out.stopPreserve()%]
+		
 		pass
 
 	def	configure(self):
 		sm0 = smach.StateMachine(outcomes=['succeeded','aborted','preempted'], input_keys = ['action_feedback'], output_keys = ['action_feedback'])
+		[%=out.startPreserve("#", "#", "user data defs", true)%]
+		[%=out.stopPreserve()%]
 		sis = smach_ros.IntrospectionServer('[%=node.name.replace(" ", "_")%]', sm0, '/[%=node.name.replace(" ", "_")%]_sm')
 		sis.start()
 		with sm0:
+
 		[%
 			var acstypes: Sequence;
 			var remap: String;
@@ -88,7 +100,28 @@ for (parameter in node.parameter)
 				remap = ac.remap_overwrite;
 			}
 		 %]
-			smach.StateMachine.add('[%=ac.name.replace(" ", "_")%]', smach_ros.SimpleActionState('[%=remap%]', [%=acstypes[1]%]Action, self.[%=ac.name.replace(" ", "_")%]_goal), {
+		 [% if(ac.goal_type.toString() == "userdata_goal"){%]
+		 	def [%=ac.name.replace(" ", "_")%]_goal_cb(userdata, goal):
+		 		[%=out.startPreserve("#", "#", (ac.name.toString()+" goal callback"), true)%]
+				[%=out.stopPreserve()%]
+				return goal
+
+			def [%=ac.name.replace(" ", "_")%]_result_cb(userdata, status, result):
+		 		[%=out.startPreserve("#", "#", (ac.name.toString()+" result callback"), true)%]
+				[%=out.stopPreserve()%]
+				return 
+		 [%}%]
+		 		
+			smach.StateMachine.add('[%=ac.name.replace(" ", "_")%]', smach_ros.SimpleActionState('[%=remap%]', [%=acstypes[1]%]Action, 
+				[% if(ac.goal_type.toString() == "userdata_goal"){%]
+				goal_cb=[%=ac.name.replace(" ", "_")%]_goal_cb, result_cb=[%=ac.name.replace(" ", "_")%]_result_cb,
+				[%=out.startPreserve("#", "#", ("action state "+ ac.name.toString()+" constructor arguments"), true)%]
+				[%=out.stopPreserve()%]
+				[%}else{%]
+				self.[%=ac.name.replace(" ", "_")%]_goal
+				[%}%]
+				), 
+				transitions={
 			[%
 			for (transition in node.transitions){
 			if(transition.Source.type.name == "ActionState" or transition.Source.type.name == "ServiceState")
@@ -96,18 +129,23 @@ for (parameter in node.parameter)
 			if(transition.Source.name == ac.name){
 			if(transition.Target.type.name == "ActionState" or transition.Target.type.name == "ServiceState"){
 			%]
-				"[%=transition.name%]":"[%=transition.Target.name%]",
+					"[%=transition.name%]":"[%=transition.Target.name%]",
 			[%
 			}
 			else{
 			%]
-				"[%=transition.name%]":"[%=transition.Target.type.name%]",
+					"[%=transition.name%]":"[%=transition.Target.type.name%]",
 			[%
 			}
 			}
 			}
 			}%]
-			})
+					}, 
+				[%=out.startPreserve("#", "#", ("remapping"+ ac.name.toString()), true)%]	
+				[%=out.stopPreserve()%]
+				)
+
+				
 		[%
 		}%]
 		[%
